@@ -15,6 +15,7 @@ packages:
   - p7zip-rar
   - python-is-python3
   - pypy3
+  - tree
 #
 %{ if ssh_authorized_keys != "" ~}
 ssh_authorized_keys: ${ssh_authorized_keys}
