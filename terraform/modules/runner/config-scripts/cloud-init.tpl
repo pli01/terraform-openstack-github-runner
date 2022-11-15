@@ -16,6 +16,11 @@ packages:
   - python-is-python3
   - pypy3
   - tree
+  - git
+  - python3
+  - python3-dev
+  - python3-pip
+  - python3-venv
 #
 %{ if ssh_authorized_keys != "" ~}
 ssh_authorized_keys: ${ssh_authorized_keys}
