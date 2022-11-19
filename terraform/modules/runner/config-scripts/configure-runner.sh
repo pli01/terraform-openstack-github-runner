@@ -40,6 +40,7 @@ sudo ./bin/installdependencies.sh
 # Last step, run it!
 sudo ./svc.sh install
 sudo ./svc.sh start
+sudo ./svc.sh status
 )
 
 EOF
