@@ -22,6 +22,12 @@ data "cloudinit_config" "runner_config" {
     })
   }
 
+  # apt.sh
+  part {
+    content_type = "text/plain"
+    content      = file("${path.module}/config-scripts/apt.sh")
+  }
+
   # install-runner.sh
   part {
     content_type = "text/plain"
