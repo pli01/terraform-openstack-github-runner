@@ -1,4 +1,11 @@
 #!/bin/bash
+set -e -o pipefail
+echo "# RUNNING: $(dirname $0)/$(basename $0)"
+
+script="apt.sh"
+cat <<'EOF_SCRIPT' > /home/ubuntu/${script}
+#!/bin/bash
+
 ## https://github.com/actions/runner-images/blob/4994130a965d5529b240818de583d48febefcfdf/images/linux/scripts/base/apt.sh
 
 # Stop and disable apt-daily upgrade services;
@@ -39,3 +46,8 @@ apt-get install jq
 # Install apt-fast using quick-install.sh
 # https://github.com/ilikenwf/apt-fast
 bash -c "$(curl -sL https://raw.githubusercontent.com/ilikenwf/apt-fast/master/quick-install.sh)"
+EOF_SCRIPT
+echo "# run /home/ubuntu/${script}"
+chmod +x /home/ubuntu/${script}
+sudo -s /bin/bash -c /home/ubuntu/${script}
+echo "# end /home/ubuntu/${script}"
