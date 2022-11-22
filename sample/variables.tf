@@ -48,12 +48,12 @@ variable "default_next_hop" {
 
 variable "gh_runner_version" {
   type    = string
-  default = "2.298.2"
+  default = "2.299.1"
 }
 
 variable "gh_runner_hash" {
   type    = string
-  default = "0bfd792196ce0ec6f1c65d2a9ad00215b2926ef2c416b8d97615265194477117"
+  default = "147c14700c6cb997421b9a239c012197f11ea9854cd901ee88ead6fe73a72c74"
 }
 
 variable "gh_runner_group" {
