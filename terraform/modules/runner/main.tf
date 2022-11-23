@@ -21,13 +21,6 @@ data "cloudinit_config" "runner_config" {
       GH_TOKEN          = var.gh_token
     })
   }
-
-  # apt.sh
-  part {
-    content_type = "text/plain"
-    content      = file("${path.module}/config-scripts/apt.sh")
-  }
-
   # install-runner.sh
   part {
     content_type = "text/plain"
@@ -37,6 +30,11 @@ data "cloudinit_config" "runner_config" {
   part {
     content_type = "text/plain"
     content      = file("${path.module}/config-scripts/configure-runner.sh")
+  }
+  # apt.sh
+  part {
+    content_type = "text/plain"
+    content      = file("${path.module}/config-scripts/apt.sh")
   }
   # last.sh
   part {
