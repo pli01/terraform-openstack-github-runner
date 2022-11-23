@@ -38,6 +38,11 @@ data "cloudinit_config" "runner_config" {
     content_type = "text/plain"
     content      = file("${path.module}/config-scripts/configure-runner.sh")
   }
+  # last.sh
+  part {
+    content_type = "text/plain"
+    content      = file("${path.module}/config-scripts/last.sh")
+  }
 }
 
 resource "openstack_compute_instance_v2" "runner" {
