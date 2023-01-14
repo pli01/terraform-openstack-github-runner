@@ -7,6 +7,14 @@ variable "ext_net_name" {
   default = "Ext-Net"
 }
 
+variable "network_name" {
+  type = string
+}
+
+variable "subnet_name" {
+  type = string
+}
+
 variable "runner_flavor" {
   type    = string
   default = "s1-2"
@@ -25,6 +33,14 @@ variable "runner_volume_type" {
 variable "runner_volume_size" {
   type    = number
   default = 0
+}
+variable "runner_data_volume_size" {
+  type    = number
+  default = 0
+}
+
+variable "runner_name" {
+  default = ""
 }
 
 variable "runner_count" {
@@ -71,4 +87,16 @@ variable "gh_token" {
 variable "allow_fip" {
   type    = bool
   default = false
+}
+variable "gh_label" {
+  type    = string
+  default = ""
+}
+variable "http_proxy" {
+  type    = string
+  default = ""
+}
+variable "no_proxy" {
+  type    = string
+  default = ""
 }

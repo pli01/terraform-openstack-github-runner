@@ -6,6 +6,9 @@ variable "ext_net_name" {
   type    = string
   default = "Ext-Net"
 }
+variable "network_name" {}
+variable "subnet_name" {}
+
 
 variable "runner_flavor" {
   type    = string
@@ -25,6 +28,14 @@ variable "runner_volume_type" {
 variable "runner_volume_size" {
   type    = number
   default = 0
+}
+variable "runner_data_volume_size" {
+  type    = number
+  default = 0
+}
+
+variable "runner_name" {
+  default = ""
 }
 
 variable "runner_count" {
@@ -48,12 +59,12 @@ variable "default_next_hop" {
 
 variable "gh_runner_version" {
   type    = string
-  default = "2.299.1"
+  default = "2.300.2"
 }
 
 variable "gh_runner_hash" {
   type    = string
-  default = "147c14700c6cb997421b9a239c012197f11ea9854cd901ee88ead6fe73a72c74"
+  default = "ed5bf2799c1ef7b2dd607df66e6b676dff8c44fb359c6fedc9ebf7db53339f0c"
 }
 
 variable "gh_runner_group" {
@@ -72,3 +83,16 @@ variable "allow_fip" {
   type    = bool
   default = false
 }
+variable "gh_label" {
+  type    = string
+  default = ""
+}
+variable "http_proxy" {
+  type    = string
+  default = ""
+}
+variable "no_proxy" {
+  type    = string
+  default = ""
+}
+
