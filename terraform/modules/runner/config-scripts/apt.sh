@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e -o pipefail
+set -x -e -o pipefail
 echo "# RUNNING: $(dirname $0)/$(basename $0)"
 
 script="apt.sh"
@@ -49,5 +49,5 @@ bash -c "$(curl -sL https://raw.githubusercontent.com/ilikenwf/apt-fast/master/q
 EOF_SCRIPT
 echo "# run /home/ubuntu/${script}"
 chmod +x /home/ubuntu/${script}
-sudo -s /bin/bash -c /home/ubuntu/${script}
+/bin/bash -c /home/ubuntu/${script}
 echo "# end /home/ubuntu/${script}"

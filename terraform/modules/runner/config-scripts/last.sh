@@ -9,5 +9,5 @@ reboot
 EOF_SCRIPT
 echo "# run /home/ubuntu/${script}"
 chmod +x /home/ubuntu/${script}
-sudo -s /bin/bash -c /home/ubuntu/${script}
+/bin/bash -c /home/ubuntu/${script}
 echo "# end /home/ubuntu/${script}"
