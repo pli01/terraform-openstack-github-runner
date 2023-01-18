@@ -8,6 +8,6 @@ resource "null_resource" "router_and_router_interface_are_created" {
 }
 
 resource "openstack_networking_floatingip_v2" "runner" {
-  pool       = var.ext_net_name
+  pool       = var.fip_net_name
   depends_on = [null_resource.router_and_router_interface_are_created]
 }

@@ -1,11 +1,15 @@
 data "openstack_networking_network_v2" "ext_net" {
-  name = var.ext_net_name
+  count = length(var.router_config)
+
+  name = var.router_config[count.index].extnet
 }
 
 resource "openstack_networking_router_v2" "runner" {
-  name                = "${terraform.workspace}-runner"
+  count = length(var.router_config)
+
+  name                = format("%s-%s-runner", terraform.workspace, var.router_config[count.index].name)
+  external_network_id = data.openstack_networking_network_v2.ext_net[count.index].id
   admin_state_up      = true
-  external_network_id = data.openstack_networking_network_v2.ext_net.id
 }
 
 resource "openstack_networking_network_v2" "runner" {
@@ -23,23 +27,39 @@ resource "openstack_networking_subnet_v2" "runner" {
 }
 
 resource "openstack_networking_subnet_route_v2" "runner" {
+  count = length(var.subnet_routes_config)
+
   subnet_id        = openstack_networking_subnet_v2.runner.id
-  destination_cidr = "0.0.0.0/0"
-  next_hop         = var.default_next_hop == "" ? openstack_networking_subnet_v2.runner.gateway_ip : var.default_next_hop
+  destination_cidr = var.subnet_routes_config[count.index].destination
+  next_hop         = var.subnet_routes_config[count.index].nexthop == "" ? openstack_networking_subnet_v2.runner.gateway_ip : var.subnet_routes_config[count.index].nexthop
+}
+
+resource "openstack_networking_port_v2" "runner" {
+  count              = length(var.router_config)
+  name               = format("%s-%s-runner", terraform.workspace, var.router_config[count.index].name)
+  admin_state_up     = "true"
+  no_security_groups = false
+  network_id         = openstack_networking_network_v2.runner.id
+  fixed_ip {
+    subnet_id  = openstack_networking_subnet_v2.runner.id
+    ip_address = var.router_config[count.index].ip
+  }
 }
 
 resource "openstack_networking_router_interface_v2" "runner" {
-  timeouts {
-    create = "30m"
-    delete = "30m"
-  }
+  count = length(var.router_config)
 
-  router_id = openstack_networking_router_v2.runner.id
-  subnet_id = openstack_networking_subnet_v2.runner.id
+  router_id = openstack_networking_router_v2.runner[count.index].id
+  # subnet_id = openstack_networking_subnet_v2.runner.id
+  port_id = openstack_networking_port_v2.runner[count.index].id
   depends_on = [
     openstack_networking_router_v2.runner,
     openstack_networking_network_v2.runner,
     openstack_networking_subnet_v2.runner,
     openstack_networking_subnet_route_v2.runner
   ]
+  timeouts {
+    create = "30m"
+    delete = "30m"
+  }
 }

@@ -2,13 +2,40 @@ variable "keypair_name" {
   type    = string
   default = ""
 }
-variable "ext_net_name" {
-  type    = string
-  default = "Ext-Net"
+variable "dns_nameservers" {
+  description = "List of DNS"
+  type        = list(string)
+  default     = ["213.186.33.99"]
 }
-variable "network_name" {}
-variable "subnet_name" {}
+variable "default_cidr" {
+  description = "Default private CIDR"
+  type        = string
+  default     = "192.168.1.0/24"
+}
 
+variable "router_config" {
+  description = "list of map of routers configuration: router name, ip , external net, enable runner fip on this network"
+  type = list(object({
+    name      = string
+    ip        = string
+    extnet    = string
+    allow_fip = bool
+  }))
+  default = [
+    { name = "rt_apps", ip = "192.168.1.1", extnet = "Ext-Net", allow_fip = false }
+  ]
+}
+
+variable "subnet_routes_config" {
+  description = "list of map of routers configuration: destination route, nexthop to reach this destination"
+  type = list(object({
+    destination = string
+    nexthop     = string
+  }))
+  default = [
+    { destination = "0.0.0.0/0", nexthop = "192.168.1.1" }
+  ]
+}
 
 variable "runner_flavor" {
   type    = string
@@ -43,20 +70,6 @@ variable "runner_count" {
   default = 1
 }
 
-variable "dns_nameservers" {
-  type    = list(string)
-  default = ["213.186.33.99"]
-}
-
-variable "default_cidr" {
-  type    = string
-  default = "192.168.1.0/24"
-}
-variable "default_next_hop" {
-  type    = string
-  default = ""
-}
-
 variable "gh_runner_version" {
   type    = string
   default = "2.300.2"
@@ -79,10 +92,6 @@ variable "gh_token" {
   type = string
 }
 
-variable "allow_fip" {
-  type    = bool
-  default = false
-}
 variable "gh_label" {
   type    = string
   default = ""
@@ -95,4 +104,3 @@ variable "no_proxy" {
   type    = string
   default = ""
 }
-
