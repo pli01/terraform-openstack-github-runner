@@ -10,7 +10,7 @@ export https_proxy='${http_proxy}'
 export no_proxy='${no_proxy}'
 %{ endif ~}
 %{ if RUNNER_URL_DEPLOYER_SCRIPT  != "" ~}
-export RUNNER_URL_DEPLOYER_SCRIPT="${RUNNER_URL_DEPLOYER_SCRIPT}"
+export RUNNER_URL_DEPLOYER_SCRIPT='${RUNNER_URL_DEPLOYER_SCRIPT}'
 %{ endif ~}
 %{ if GH_RUNNER_VERSION != "" ~}
 export GH_RUNNER_VERSION='${GH_RUNNER_VERSION}'
