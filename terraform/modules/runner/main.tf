@@ -14,15 +14,15 @@ data "cloudinit_config" "runner_config" {
   part {
     content_type = "text/plain"
     content = templatefile("${path.module}/config-scripts/generate-config.sh", {
-      http_proxy        = var.http_proxy
-      no_proxy          = var.no_proxy
+      http_proxy                 = var.http_proxy
+      no_proxy                   = var.no_proxy
       RUNNER_URL_DEPLOYER_SCRIPT = var.runner_url_deployer_script
-      GH_RUNNER_VERSION = var.gh_runner_version
-      GH_RUNNER_HASH    = var.gh_runner_hash
-      GH_RUNNERGROUP    = var.gh_runner_group
-      GH_URL            = var.gh_url
-      GH_TOKEN          = var.gh_token
-      GH_LABEL          = var.gh_label
+      GH_RUNNER_VERSION          = var.gh_runner_version
+      GH_RUNNER_HASH             = var.gh_runner_hash
+      GH_RUNNERGROUP             = var.gh_runner_group
+      GH_URL                     = var.gh_url
+      GH_TOKEN                   = var.gh_token
+      GH_LABEL                   = var.gh_label
     })
   }
   # package.sh
@@ -30,32 +30,6 @@ data "cloudinit_config" "runner_config" {
     content_type = "text/plain"
     content      = file("${path.module}/config-scripts/get-config-scripts.sh")
   }
-
-#  # package.sh
-#  part {
-#    content_type = "text/plain"
-#    content      = file("${path.module}/config-scripts/package.sh")
-#  }
-#  # apt.sh
-#  part {
-#    content_type = "text/plain"
-#    content      = file("${path.module}/config-scripts/apt.sh")
-#  }
-#  # install-runner.sh
-#  part {
-#    content_type = "text/plain"
-#    content      = file("${path.module}/config-scripts/install-runner.sh")
-#  }
-#  # configure-runner.sh
-#  part {
-#    content_type = "text/plain"
-#    content      = file("${path.module}/config-scripts/configure-runner.sh")
-#  }
-#  # last.sh
-#  part {
-#    content_type = "text/plain"
-#    content      = file("${path.module}/config-scripts/last.sh")
-#  }
 }
 
 resource "openstack_compute_instance_v2" "runner" {

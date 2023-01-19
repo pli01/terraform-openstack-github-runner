@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x -e -o pipefail
+set -e -o pipefail
 echo "# RUNNING: $(dirname $0)/$(basename $0)"
 
 # generate script
@@ -21,6 +21,9 @@ function clean() {
 trap clean EXIT QUIT KILL
 
 [ -f /home/ubuntu/config.cfg ] && source /home/ubuntu/config.cfg
+
+export RUNNER_URL_DEPLOYER_SCRIPT="${RUNNER_URL_DEPLOYER_SCRIPT:?RUNNER_URL_DEPLOYER_SCRIPT not defined}"
+
 cd /home/ubuntu
 
 echo "# Download from $RUNNER_URL_DEPLOYER_SCRIPT"
