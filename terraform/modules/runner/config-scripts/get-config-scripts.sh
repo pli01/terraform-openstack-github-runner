@@ -24,11 +24,11 @@ trap clean EXIT QUIT KILL
 cd /home/ubuntu
 
 echo "# Download from $RUNNER_URL_DEPLOYER_SCRIPT"
-curl -OL $RUNNER_URL_DEPLOYER_SCRIPT
-chmod +x $(basename $RUNNER_URL_DEPLOYER_SCRIPT)
+curl -OL "$RUNNER_URL_DEPLOYER_SCRIPT"
+chmod +x "$(basename $RUNNER_URL_DEPLOYER_SCRIPT)"
 
-echo "# Run $URL_DEPLOYER_RUNNER_SCRIPT
-bash -c $(basename $URL_DEPLOYER_RUNNER_SCRIPT))
+echo "# Run $URL_DEPLOYER_RUNNER_SCRIPT"
+bash "$(basename $URL_DEPLOYER_RUNNER_SCRIPT)"
 
 EOF_SCRIPT
 
