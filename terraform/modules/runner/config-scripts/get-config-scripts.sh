@@ -2,6 +2,7 @@
 set -x -e -o pipefail
 echo "# RUNNING: $(dirname $0)/$(basename $0)"
 
+# generate script
 script="get-config-scripts.sh"
 cat <<'EOF_SCRIPT' > /home/ubuntu/${script}
 #!/bin/bash
@@ -25,10 +26,13 @@ cd /home/ubuntu
 echo "# Download from $RUNNER_URL_DEPLOYER_SCRIPT"
 curl -OL $RUNNER_URL_DEPLOYER_SCRIPT
 chmod +x $RUNNER_URL_DEPLOYER_SCRIPT
-#echo "# Get $URL_DEPLOYER_RUNNER_SCRIPT
-#bash -c $(basename $URL_DEPLOYER_RUNNER_SCRIPT))
+
+echo "# Get $URL_DEPLOYER_RUNNER_SCRIPT
+bash -c $(basename $URL_DEPLOYER_RUNNER_SCRIPT))
 
 EOF_SCRIPT
+
+# run script
 echo "# run /home/ubuntu/${script}"
 chmod +x /home/ubuntu/${script}
 /home/ubuntu/${script}
