@@ -104,3 +104,9 @@ variable "no_proxy" {
   type    = string
   default = ""
 }
+
+variable "runner_url_deployer_script" {
+  default = "https://raw.githubusercontent.com/pli01/terraform-openstack-github-runner/config-scripts/install-runner-scripts/deploy-runner.sh"
+}
+
+
