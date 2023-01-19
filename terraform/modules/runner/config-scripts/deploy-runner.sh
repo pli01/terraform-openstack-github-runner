@@ -1,11 +1,11 @@
 #!/bin/bash
-set -x -e -o pipefail
+set -e -o pipefail
 
 function clean() {
     ret=$?
     if [ "$ret" -gt 0 ] ;then
         echo "FAILURE $0: $ret"
-    else
+   else
         echo "SUCCESS $0: $ret"
     fi
     exit $ret
@@ -22,11 +22,6 @@ URL_PATH=$(dirname ${RUNNER_URL_DEPLOYER_SCRIPT})
 CONFIG_SCRIPTS_FILE="package.sh apt.sh install-runner.sh configure-runner.sh last.sh"
 
 for script in ${CONFIG_SCRIPTS_FILE}; do
-	echo "# Get $URL_PATH/${script}"
-	[ -f ${script} ] && rm -rf ${script}
-	curl -OL "$URL_PATH/${script}"
-	chmod +x ${script}
-
-	echo "# Run ${script}"
-	bash ${script}
+	echo "# Install $URL_PATH/${script}"
+	bash -c "$(curl -fsSL $URL_PATH/$script)"
 done
