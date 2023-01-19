@@ -36,6 +36,7 @@ echo "${GH_RUNNER_HASH} actions-runner-linux-x64-${GH_RUNNER_VERSION}.tar.gz" | 
 tar xzf ./actions-runner-linux-x64-${GH_RUNNER_VERSION}.tar.gz
 )
 EOF
+
 echo "# run /home/ubuntu/install-runner.sh"
 chmod +x /home/ubuntu/install-runner.sh
 su - ubuntu -c "bash -c /home/ubuntu/install-runner.sh"

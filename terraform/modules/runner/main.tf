@@ -14,42 +14,38 @@ data "cloudinit_config" "runner_config" {
   part {
     content_type = "text/plain"
     content = templatefile("${path.module}/config-scripts/generate-config.sh", {
-      GH_RUNNER_VERSION = var.gh_runner_version
-      GH_RUNNER_HASH    = var.gh_runner_hash
-      GH_RUNNERGROUP    = var.gh_runner_group
-      GH_URL            = var.gh_url
-      GH_TOKEN          = var.gh_token
+      http_proxy                 = var.http_proxy
+      no_proxy                   = var.no_proxy
+      RUNNER_URL_DEPLOYER_SCRIPT = var.runner_url_deployer_script
+      GH_RUNNER_VERSION          = var.gh_runner_version
+      GH_RUNNER_HASH             = var.gh_runner_hash
+      GH_RUNNERGROUP             = var.gh_runner_group
+      GH_URL                     = var.gh_url
+      GH_TOKEN                   = var.gh_token
+      GH_LABEL                   = var.gh_label
     })
   }
-  # install-runner.sh
+  # package.sh
   part {
     content_type = "text/plain"
-    content      = file("${path.module}/config-scripts/install-runner.sh")
-  }
-  # configure-runner.sh
-  part {
-    content_type = "text/plain"
-    content      = file("${path.module}/config-scripts/configure-runner.sh")
-  }
-  # apt.sh
-  part {
-    content_type = "text/plain"
-    content      = file("${path.module}/config-scripts/apt.sh")
-  }
-  # last.sh
-  part {
-    content_type = "text/plain"
-    content      = file("${path.module}/config-scripts/last.sh")
+    content      = file("${path.module}/config-scripts/get-config-scripts.sh")
   }
 }
 
 resource "openstack_compute_instance_v2" "runner" {
   count       = var.runner_count
-  name        = "${terraform.workspace}-runner-${count.index + 1}"
-  image_name  = var.image
+  name        = "${terraform.workspace}-${var.runner_name != "" ? var.runner_name : "runner"}-${count.index + 1}"
   flavor_name = var.flavor
   key_pair    = var.keypair_name
   user_data   = data.cloudinit_config.runner_config.rendered
+
+  block_device {
+    uuid                  = element(openstack_blockstorage_volume_v3.runner_root.*.id, count.index)
+    source_type           = "volume"
+    boot_index            = 0
+    destination_type      = "volume"
+    delete_on_termination = true
+  }
 
   network {
     port = element(openstack_networking_port_v2.runner.*.id, count.index)
@@ -61,25 +57,38 @@ resource "openstack_compute_instance_v2" "runner" {
   }
 }
 
-resource "openstack_blockstorage_volume_v2" "runner" {
+data "openstack_images_image_v2" "runner" {
+  name = var.image
+}
+
+resource "openstack_blockstorage_volume_v3" "runner_root" {
   count       = var.runner_count > 0 && var.volume_size > 0 ? var.runner_count : 0
-  name        = "${terraform.workspace}-runner-${count.index + 1}"
+  name        = "${terraform.workspace}-runner_root-${count.index + 1}"
+  image_id    = data.openstack_images_image_v2.runner.id
   size        = var.volume_size
   volume_type = var.volume_type
 }
 
+resource "openstack_blockstorage_volume_v3" "runner" {
+  count       = var.runner_count > 0 && var.data_volume_size > 0 ? var.runner_count : 0
+  name        = "${terraform.workspace}-runner-${count.index + 1}"
+  size        = var.data_volume_size
+  volume_type = var.volume_type
+}
+
 resource "openstack_compute_volume_attach_v2" "attached" {
-  count = var.runner_count > 0 && var.volume_size > 0 ? var.runner_count : 0
+  count = var.runner_count > 0 && var.data_volume_size > 0 ? var.runner_count : 0
   timeouts {
     create = "30m"
     delete = "30m"
   }
 
   instance_id = element(openstack_compute_instance_v2.runner.*.id, count.index)
-  volume_id   = element(openstack_blockstorage_volume_v2.runner.*.id, count.index)
+  volume_id   = element(openstack_blockstorage_volume_v3.runner.*.id, count.index)
   depends_on = [
     openstack_compute_instance_v2.runner,
-    openstack_blockstorage_volume_v2.runner
+    openstack_blockstorage_volume_v3.runner_root,
+    openstack_blockstorage_volume_v3.runner
   ]
 }
 resource "openstack_networking_secgroup_v2" "runner" {
