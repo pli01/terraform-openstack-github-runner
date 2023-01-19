@@ -1,3 +1,7 @@
+variable "runner_url_deployer_script" {
+  default = "https://raw.githubusercontent.com/pli01/terraform-openstack-github-runner/config-scripts/terraform/modules/runner/config-scripts/deploy-runner.sh"
+}
+
 variable "runner_name" {
   default = ""
 }
