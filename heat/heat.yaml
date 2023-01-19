@@ -1,0 +1,521 @@
+---
+heat_template_version: 2016-10-14
+
+description: Runner heat stack
+
+parameters:
+  dns_nameservers:
+    type: json
+    description: [ "8.8.8.8" ]
+    default: ['213.186.33.99']
+
+  subnet_cidr:
+    type: string
+    default: 192.168.1.0/24
+
+  boot_on_volume:
+    type: string
+    default: "false"
+
+  enable_fip:
+    type: string
+    default: "false"
+
+  ip_admin_router:
+    type: string
+    default: 192.168.1.254
+  ip_apps_router:
+    type: string
+    default: 192.168.1.1
+  ip_services_router:
+    type: string
+    default: 192.168.1.253
+
+  host_routes:
+    type: json
+    description: >
+      Liste de table de routage
+      [ { "destination": "0.0.0.0/0", "nexthop": "192.168.1.1"} ]
+    default: [
+        { "destination": '0.0.0.0/0', "nexthop": "192.168.2.1"}
+      ]
+
+  fip_admin_net:
+    type: string
+    default: Ext-Net
+  fip_apps_net:
+    type: string
+    default: Ext-Net
+  fip_services_net:
+    type: string
+    default: Ext-Net
+  # runner
+  keypair_name:
+    type: string
+  keypair_public_key:
+    type: string
+  runner_image:
+    type: string
+    default: "Ubuntu 20.04"
+  runner_flavor:
+    type: string
+    default: s1-2
+  runner_vol_size:
+    type: number
+    default: 10
+  runner_vol_type:
+    type: string
+    default: classic
+  http_proxy:
+    type: string
+    default: ""
+  no_proxy:
+    type: string
+    default: ""
+  ssh_authorized_keys:
+    type: json
+    description: >
+      format [
+         { "user":"myuser1", "key":"ecdsa-sha2-nistp256...."},
+         { "user":"myuser2", "key":"ecdsa-sha2-nistp256...."}
+      ]
+    default: []
+  no_proxy:
+    type: string
+    default: ""
+  RUNNER_URL_DEPLOYER_SCRIPT:
+    type: string
+    default: "https://raw.githubusercontent.com/pli01/terraform-openstack-github-runner/config-scripts/install-runner-scripts/deploy-runner.sh"
+  GH_RUNNER_VERSION:
+    type: string
+    default : "2.300.2"
+  GH_RUNNER_HASH:
+    type: string
+    default: "ed5bf2799c1ef7b2dd607df66e6b676dff8c44fb359c6fedc9ebf7db53339f0c"
+  GH_RUNNERGROUP:
+    type: string
+    default: "Default"
+  GH_URL:
+    type: string
+  GH_LABEL:
+    type: string
+    default: ""
+  GH_TOKEN:
+    type: string
+
+conditions:
+  boot_on_volume: {equals : [{get_param: boot_on_volume}, "true"]}
+  enable_fip: {equals : [{get_param: enable_fip}, "true"]}
+
+resources:
+  router_admin:
+    type: OS::Neutron::Router
+    properties:
+      external_gateway_info: { network: { get_param: fip_admin_net } }
+
+  router_apps:
+    type: OS::Neutron::Router
+    properties:
+      external_gateway_info: { network: { get_param: fip_apps_net } }
+
+  router_services:
+    type: OS::Neutron::Router
+    properties:
+      external_gateway_info: { network: { get_param: fip_services_net } }
+
+  network:
+    type: OS::Neutron::Net
+
+  subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network_id: { get_resource: network }
+      cidr: { get_param: subnet_cidr }
+      dns_nameservers: { get_param: dns_nameservers }
+      ip_version: 4
+      enable_dhcp: true
+      host_routes: { get_param: host_routes }
+
+  port_admin:
+    type: OS::Neutron::Port
+    properties:
+      network: { get_resource: network }
+      fixed_ips:
+        - subnet: { get_resource: subnet }
+          ip_address: { get_param: ip_admin_router }
+
+  port_apps:
+    type: OS::Neutron::Port
+    properties:
+      network: { get_resource: network }
+      fixed_ips:
+        - subnet: { get_resource: subnet }
+          ip_address: { get_param: ip_apps_router }
+
+  port_services:
+    type: OS::Neutron::Port
+    properties:
+      network: { get_resource: network }
+      fixed_ips:
+        - subnet: { get_resource: subnet }
+          ip_address: { get_param: ip_services_router }
+
+  interface_admin:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: router_admin }
+      port: { get_resource: port_admin }
+  interface_apps:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: router_apps }
+      port: { get_resource: port_apps }
+  interface_services:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: router_services }
+      port: { get_resource: port_services }
+
+  runner_keypair:
+    type: OS::Nova::KeyPair
+    properties:
+      name: { get_param: keypair_name }
+      public_key: { get_param: keypair_public_key }
+
+  # conditionnal boot on volume
+  runner_root_vol:
+    condition: boot_on_volume
+    type: OS::Cinder::Volume
+    # type: OS::Heat::None
+    properties:
+      size: { get_param: runner_vol_size }
+      image: { get_param: runner_image }
+      volume_type: { get_param: runner_vol_type }
+
+  # conditionnal instance boot on volume
+  runner_instance_with_volume:
+    condition: boot_on_volume
+    type: OS::Nova::Server
+    depends_on:
+      - runner_root_vol
+      - runner_keypair
+    properties:
+      name:
+        list_join: [ '-', [ { get_param: "OS::stack_name" }, 'runner']]
+      block_device_mapping: [{ device_name: "vda", volume_id: { get_resource: runner_root_vol }, delete_on_termination: "true" }]
+      flavor: { get_param: runner_flavor }
+      key_name: { get_resource: runner_keypair }
+      networks:
+        - port: { get_resource: runner_port }
+      config_drive: true
+      user_data_format: RAW
+      user_data:
+        get_resource: runner_userdata
+
+  # conditionnal instance boot with image
+  runner_instance:
+    condition: {not: boot_on_volume}
+    type: OS::Nova::Server
+    depends_on:
+      - runner_keypair
+    properties:
+      name:
+        list_join: [ '-', [ { get_param: "OS::stack_name" }, 'runner']]
+      image: { get_param: runner_image }
+      flavor: { get_param: runner_flavor }
+      key_name: { get_resource: runner_keypair }
+      networks:
+        - port: { get_resource: runner_port }
+      config_drive: true
+      user_data_format: RAW
+      user_data:
+        get_resource: runner_userdata
+
+  runner_userdata:
+    type: "OS::Heat::MultipartMime"
+    properties:
+      parts:
+        - config: {get_resource: cloud_config}
+        - config: {get_resource: start_install}
+
+  cloud_config:
+    type: OS::Heat::CloudConfig
+    properties:
+      cloud_config:
+        merge_how: dict(recurse_array)+list(append)
+        preserve_hostname: true
+        manage_etc_hosts: true
+        write_files:
+        - path: /home/ubuntu/proxy.sh
+          owner: ubuntu:ubuntu
+          permissions: "0755"
+          content:
+            str_replace:
+              template: |
+                export http_proxy=$http_proxy
+                export https_proxy=$http_proxy
+                export no_proxy=$no_proxy
+              params:
+                $http_proxy: { get_param: http_proxy }
+                $no_proxy: { get_param: no_proxy }
+        - path: /home/ubuntu/config.cfg
+          owner: ubuntu:ubuntu
+          permissions: "0755"
+          content:
+            str_replace:
+              template: |
+                #!/bin/bash
+                if [[ -n "$http_proxy" ]]; then
+                  export http_proxy='$http_proxy'
+                  export https_proxy='$http_proxy'
+                fi
+                if [[ -n "$no_proxy" ]]; then
+                  export no_proxy='$no_proxy'
+                fi
+                if [[ -n "$RUNNER_URL_DEPLOYER_SCRIPT" ]]; then
+                  export RUNNER_URL_DEPLOYER_SCRIPT='$RUNNER_URL_DEPLOYER_SCRIPT'
+                fi
+                if [[ -n "$GH_RUNNER_VERSION" ]]; then
+                  export GH_RUNNER_VERSION='$GH_RUNNER_VERSION'
+                fi
+                if [[ -n "$GH_RUNNER_HASH" ]]; then
+                  export GH_RUNNER_HASH='$GH_RUNNER_HASH'
+                fi
+                if [[ -n "$GH_RUNNERGROUP" ]]; then
+                  export GH_RUNNERGROUP='$GH_RUNNERGROUP'
+                fi
+                if [[ -n "$GH_URL" ]]; then
+                  export GH_URL='$GH_URL'
+                fi
+                if [[ -n "$GH_TOKEN" ]]; then
+                  export GH_TOKEN='$GH_TOKEN'
+                fi
+                if [[ -n "$GH_LABEL" ]]; then
+                  export GH_LABEL='$GH_LABEL'
+                fi
+              params:
+                $http_proxy: { get_param: http_proxy }
+                $no_proxy: { get_param: no_proxy }
+                $RUNNER_URL_DEPLOYER_SCRIPT: { get_param: RUNNER_URL_DEPLOYER_SCRIPT }
+                $GH_RUNNER_VERSION: { get_param: GH_RUNNER_VERSION }
+                $GH_RUNNER_HASH: { get_param: GH_RUNNER_HASH }
+                $GH_RUNNERGROUP: { get_param: GH_RUNNERGROUP }
+                $GH_URL: { get_param: GH_URL }
+                $GH_LABEL: { get_param: GH_LABEL }
+                $GH_TOKEN: { get_param: GH_TOKEN }
+        - path: /root/prepare.sh
+          owner: root:root
+          permissions: "0755"
+          content:
+            str_replace:
+              template: |
+                #!/bin/bash
+                set -x -e -o pipefail
+                export DEBIAN_FRONTEND=noninteractive
+                # set proxy if defined
+                if [ -n "$http_proxy" ]; then
+                  export http_proxy=$http_proxy
+                  export https_proxy=$http_proxy
+                  export no_proxy=$no_proxy
+                fi
+                # Stop and disable apt-daily upgrade services;
+                systemctl stop apt-daily.timer
+                systemctl disable apt-daily.timer
+                systemctl disable apt-daily.service
+                systemctl stop apt-daily-upgrade.timer
+                systemctl disable apt-daily-upgrade.timer
+                systemctl disable apt-daily-upgrade.service
+                apt-get -qy purge unattended-upgrades
+                # install default package
+                apt-get -qqy update
+                apt-get -qy install curl git wget file sudo jq bzip2 unzip zip jq
+                # Add authorized_keys to ubuntu account
+                (
+                    HOME=/home/ubuntu
+                    if [ ! -d $HOME/.ssh ] ; then mkdir -p $HOME/.ssh ; fi
+                    echo '$ssh_authorized_keys' |  jq -re ".[].key" >> $HOME/.ssh/authorized_keys
+                    chown ubuntu. -R $HOME/.ssh
+                )
+                # Create user account with ssh/authorized_keys
+                (
+                   echo '$ssh_authorized_keys' | \
+                   jq -rce '.[]'|while read data ; do
+                    user=$(echo "$data" |jq -re '.user')
+                    useradd --badnames -k /etc/skel -m -s /bin/bash -U -G sudo $user
+                    mkdir -p /home/$user/.ssh
+                    echo "$data" |jq -re '.key' >> /home/$user/.ssh/authorized_keys
+                    chown $user.$user /home/$user -R
+                  done
+                )
+              params:
+                $http_proxy: { get_param: http_proxy }
+                $no_proxy: { get_param: no_proxy }
+                $ssh_authorized_keys: { get_param: ssh_authorized_keys }
+        runcmd:
+          - /root/prepare.sh
+
+  start_install:
+    type: "OS::Heat::SoftwareConfig"
+    properties:
+      group: ungrouped
+      config:
+         str_replace:
+           template: |
+             #!/bin/bash
+             set -e -o pipefail
+             echo "# RUNNING: $(dirname $0)/$(basename $0)"
+             
+             # generate script
+             script="get-config-scripts.sh"
+             cat <<'EOF_SCRIPT' > /home/ubuntu/${script}
+             #!/bin/bash
+             set -x -e -o pipefail
+             
+             function clean() {
+                 ret=$?
+                 if [ "$ret" -gt 0 ] ;then
+                     echo "FAILURE $0: $ret"
+                 else
+                     echo "SUCCESS $0: $ret"
+                 fi
+                 exit $ret
+             }
+             trap clean EXIT QUIT KILL
+             
+             [ -f /home/ubuntu/config.cfg ] && source /home/ubuntu/config.cfg
+             export RUNNER_URL_DEPLOYER_SCRIPT="${RUNNER_URL_DEPLOYER_SCRIPT:?RUNNER_URL_DEPLOYER_SCRIPT not defined}"
+             cd /home/ubuntu
+             
+             echo "# Download from $RUNNER_URL_DEPLOYER_SCRIPT"
+             curl -OL "$RUNNER_URL_DEPLOYER_SCRIPT"
+             chmod +x "$(basename $RUNNER_URL_DEPLOYER_SCRIPT)"
+             
+             echo "# Run $RUNNER_URL_DEPLOYER_SCRIPT"
+             bash "$(basename $RUNNER_URL_DEPLOYER_SCRIPT)"
+             
+             EOF_SCRIPT
+             
+             # run script
+             echo "# run /home/ubuntu/${script}"
+             chmod +x /home/ubuntu/${script}
+             /home/ubuntu/${script}
+             echo "# end /home/ubuntu/${script}"
+           params:
+             $http_proxy: { get_param: http_proxy }
+             $no_proxy: { get_param: no_proxy }
+
+  runner_security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      description: Add security group rules for server
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+          port_range_min: 22
+          port_range_max: 22
+
+  runner_port:
+    type: OS::Neutron::Port
+    properties:
+      network: { get_resource: network }
+      fixed_ips:
+        - subnet: { get_resource: subnet }
+      security_groups: [{ get_resource: runner_security_group }]
+
+  poolmember:
+    condition: enable_fip
+    type: OS::Octavia::PoolMember
+    properties:
+      address:
+        if:
+          - boot_on_volume
+          - { get_attr: [ runner_instance_with_volume, first_address ] }
+          - { get_attr: [ runner_instance, first_address ] }
+      pool: { get_resource: pool }
+      protocol_port: 22
+      subnet: { get_resource: subnet }
+
+  pool:
+    condition: enable_fip
+    type: OS::Octavia::Pool
+    properties:
+      lb_algorithm: ROUND_ROBIN
+      protocol: TCP
+      listener: { get_resource: listener }
+
+  listener:
+    condition: enable_fip
+    type: OS::Octavia::Listener
+    properties:
+      loadbalancer: { get_resource: lb }
+      protocol: TCP
+      protocol_port: 2222
+
+  lb:
+    condition: enable_fip
+    type: OS::Octavia::LoadBalancer
+    properties:
+      vip_subnet: { get_resource: subnet }
+
+  runner_floating_ip:
+    condition: enable_fip
+    type: OS::Neutron::FloatingIP
+    depends_on:
+      - runner_instance
+    properties:
+      floating_network: { get_param: fip_admin_net }
+      port_id: { get_attr: [ lb, vip_port_id ] }
+      #port_id: { get_resource: runner_port }
+
+outputs:
+  router_admin_id:
+    value: { get_resource: router_admin }
+  router_apps_id:
+    value: { get_resource: router_apps }
+  router_services_id:
+    value: { get_resource: router_services }
+
+  net_id:
+    description: network id
+    value: { get_resource: network }
+  subnet_id:
+    description: subnet id
+    value: { get_resource: subnet }
+  runner_private_ip:
+    description: runner private IP address
+    value:
+      if:
+        - boot_on_volume
+        - { get_attr: [ runner_instance_with_volume, first_address ] }
+        - { get_attr: [ runner_instance, first_address ] }
+  runner_instance_id:
+    description: runner nova ressource id
+    value:
+      if:
+        - boot_on_volume
+        - { get_resource: runner_instance_with_volume }
+        - { get_resource: runner_instance }
+  runner_port_id:
+    description: runner port id
+    value: { get_resource: runner_port }
+  runner_security_group_id:
+    description: runner security id
+    value: { get_resource: runner_security_group }
+  runner_root_vol_id:
+    description: runner cinder volume id
+    value: { get_resource: runner_root_vol }
+  runner_public_ip:
+    description: runner public IP address
+    value:
+      if:
+        - enable_fip
+        - { get_attr: [ runner_floating_ip, floating_ip_address ] }
+        - ""
+  runner_floating_ip_id:
+    description: runner floating ip id
+    value:
+      if:
+        - enable_fip
+        - { get_resource: runner_floating_ip }
+        - ""
+
