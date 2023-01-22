@@ -37,7 +37,7 @@ parameters:
       Liste de table de routage
       [ { "destination": "0.0.0.0/0", "nexthop": "192.168.1.1"} ]
     default: [
-        { "destination": '0.0.0.0/0', "nexthop": "192.168.2.1"}
+        { "destination": '0.0.0.0/0', "nexthop": "192.168.1.1"}
       ]
 
   fip_admin_net:
@@ -54,6 +54,9 @@ parameters:
     type: string
   keypair_public_key:
     type: string
+  runner_env:
+    type: string
+    default: "default"
   runner_image:
     type: string
     default: "Ubuntu 20.04"
@@ -104,7 +107,6 @@ parameters:
     type: string
 
 conditions:
-  boot_on_volume: {equals : [{get_param: boot_on_volume}, "true"]}
   enable_fip: {equals : [{get_param: enable_fip}, "true"]}
 
 resources:
@@ -182,54 +184,21 @@ resources:
       name: { get_param: keypair_name }
       public_key: { get_param: keypair_public_key }
 
-  # conditionnal boot on volume
-  runner_root_vol:
-    condition: boot_on_volume
-    type: OS::Cinder::Volume
-    # type: OS::Heat::None
+  runner_security_group:
+    type: OS::Neutron::SecurityGroup
     properties:
-      size: { get_param: runner_vol_size }
-      image: { get_param: runner_image }
-      volume_type: { get_param: runner_vol_type }
+      description: Add security group rules for server
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+          port_range_min: 22
+          port_range_max: 22
 
-  # conditionnal instance boot on volume
-  runner_instance_with_volume:
-    condition: boot_on_volume
-    type: OS::Nova::Server
-    depends_on:
-      - runner_root_vol
-      - runner_keypair
+  bastion_userdata:
+    type: "OS::Heat::MultipartMime"
     properties:
-      name:
-        list_join: [ '-', [ { get_param: "OS::stack_name" }, 'runner']]
-      block_device_mapping: [{ device_name: "vda", volume_id: { get_resource: runner_root_vol }, delete_on_termination: "true" }]
-      flavor: { get_param: runner_flavor }
-      key_name: { get_resource: runner_keypair }
-      networks:
-        - port: { get_resource: runner_port }
-      config_drive: true
-      user_data_format: RAW
-      user_data:
-        get_resource: runner_userdata
-
-  # conditionnal instance boot with image
-  runner_instance:
-    condition: {not: boot_on_volume}
-    type: OS::Nova::Server
-    depends_on:
-      - runner_keypair
-    properties:
-      name:
-        list_join: [ '-', [ { get_param: "OS::stack_name" }, 'runner']]
-      image: { get_param: runner_image }
-      flavor: { get_param: runner_flavor }
-      key_name: { get_resource: runner_keypair }
-      networks:
-        - port: { get_resource: runner_port }
-      config_drive: true
-      user_data_format: RAW
-      user_data:
-        get_resource: runner_userdata
+      parts:
+        - config: {get_resource: cloud_config}
 
   runner_userdata:
     type: "OS::Heat::MultipartMime"
@@ -404,33 +373,57 @@ resources:
              $http_proxy: { get_param: http_proxy }
              $no_proxy: { get_param: no_proxy }
 
-  runner_security_group:
-    type: OS::Neutron::SecurityGroup
+  # runner group
+  rg:
+    depends_on:
+      - runner_keypair
+      - runner_security_group
+    type: OS::Heat::ResourceGroup
     properties:
-      description: Add security group rules for server
-      rules:
-        - remote_ip_prefix: 0.0.0.0/0
-          protocol: tcp
-          port_range_min: 22
-          port_range_max: 22
+      count: 2
+      resource_def:
+        type: OS::Stack::Runner
+        properties:
+          name:
+            list_join: [ '-', [ 'runner', { get_param: runner_env }, "%index%" ]]
+          image: { get_param: runner_image }
+          flavor: { get_param: runner_flavor }
+          keypair: { get_param: keypair_name }
+          vol_size: { get_param: runner_vol_size }
+          vol_type: { get_param: runner_vol_type }
+          security_group:
+            - { get_resource: runner_security_group }
+          network: { get_resource: network }
+          subnet: { get_resource: subnet }
+          userdata: { get_resource: runner_userdata }
+          boot_on_volume: { get_param: boot_on_volume }
 
-  runner_port:
-    type: OS::Neutron::Port
+  bastion:
+    condition: enable_fip
+    depends_on:
+      - runner_keypair
+      - runner_security_group
+    type: OS::Stack::Runner
     properties:
+      name:
+        list_join: [ '-', [ 'bastion', 'runner', { get_param: runner_env } ]]
+      image: { get_param: runner_image }
+      flavor: { get_param: runner_flavor }
+      keypair: { get_param: keypair_name }
+      vol_size: { get_param: runner_vol_size }
+      vol_type: { get_param: runner_vol_type }
+      security_group:
+        - { get_resource: runner_security_group }
       network: { get_resource: network }
-      fixed_ips:
-        - subnet: { get_resource: subnet }
-      security_groups: [{ get_resource: runner_security_group }]
+      subnet: { get_resource: subnet }
+      userdata: { get_resource: bastion_userdata }
+      boot_on_volume: { get_param: boot_on_volume }
 
   poolmember:
     condition: enable_fip
     type: OS::Octavia::PoolMember
     properties:
-      address:
-        if:
-          - boot_on_volume
-          - { get_attr: [ runner_instance_with_volume, first_address ] }
-          - { get_attr: [ runner_instance, first_address ] }
+      address: { get_attr: [ bastion, private_ip] }
       pool: { get_resource: pool }
       protocol_port: 22
       subnet: { get_resource: subnet }
@@ -455,17 +448,16 @@ resources:
     condition: enable_fip
     type: OS::Octavia::LoadBalancer
     properties:
-      vip_subnet: { get_resource: subnet }
+     vip_subnet: { get_resource: subnet }
 
-  runner_floating_ip:
+  bastion_floating_ip:
     condition: enable_fip
     type: OS::Neutron::FloatingIP
     depends_on:
-      - runner_instance
+      - lb
     properties:
       floating_network: { get_param: fip_admin_net }
       port_id: { get_attr: [ lb, vip_port_id ] }
-      #port_id: { get_resource: runner_port }
 
 outputs:
   router_admin_id:
@@ -474,7 +466,6 @@ outputs:
     value: { get_resource: router_apps }
   router_services_id:
     value: { get_resource: router_services }
-
   net_id:
     description: network id
     value: { get_resource: network }
@@ -483,39 +474,31 @@ outputs:
     value: { get_resource: subnet }
   runner_private_ip:
     description: runner private IP address
-    value:
-      if:
-        - boot_on_volume
-        - { get_attr: [ runner_instance_with_volume, first_address ] }
-        - { get_attr: [ runner_instance, first_address ] }
+    value: { get_attr: [ rg, private_ip] }
+
   runner_instance_id:
     description: runner nova ressource id
-    value:
-      if:
-        - boot_on_volume
-        - { get_resource: runner_instance_with_volume }
-        - { get_resource: runner_instance }
+    value: { get_attr: [ rg, instance_id ] }
   runner_port_id:
     description: runner port id
-    value: { get_resource: runner_port }
+    value: { get_attr: [ rg, port_id ] }
+  runner_root_vol_id:
+    description: runner volume id
+    value: { get_attr: [ rg, root_vol_id ] }
   runner_security_group_id:
     description: runner security id
     value: { get_resource: runner_security_group }
-  runner_root_vol_id:
-    description: runner cinder volume id
-    value: { get_resource: runner_root_vol }
-  runner_public_ip:
-    description: runner public IP address
+  bastion_public_ip:
+    description: bastion public IP address
     value:
       if:
         - enable_fip
-        - { get_attr: [ runner_floating_ip, floating_ip_address ] }
+        - { get_attr: [ bastion_floating_ip, floating_ip_address ] }
         - ""
-  runner_floating_ip_id:
-    description: runner floating ip id
+  bastion_floating_ip_id:
+    description: bastion floating ip id
     value:
       if:
         - enable_fip
-        - { get_resource: runner_floating_ip }
+        - { get_resource: bastion_floating_ip }
         - ""
-
