@@ -88,7 +88,7 @@ parameters:
     default: ""
   RUNNER_URL_DEPLOYER_SCRIPT:
     type: string
-    default: "https://raw.githubusercontent.com/pli01/terraform-openstack-github-runner/config-scripts/install-runner-scripts/deploy-runner.sh"
+    default: "https://raw.githubusercontent.com/pli01/terraform-openstack-github-runner/heat/install-runner-scripts/deploy-runner.sh"
   GH_RUNNER_VERSION:
     type: string
     default : "2.300.2"
